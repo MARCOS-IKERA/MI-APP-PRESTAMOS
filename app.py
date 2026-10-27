@@ -44,7 +44,11 @@ menu = st.sidebar.radio("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y P
 # 1. CLIENTES
 if menu == "Clientes":
     st.header("👥 Clientes")
-    with st.form("nuevo_cliente"):
+        # Creamos unas variables de sesión para poder limpiar los campos
+    if "form_key" not in st.session_state:
+        st.session_state.form_key = 0
+
+    with st.form(f"nuevo_cliente_{st.session_state.form_key}"):
         col1, col2 = st.columns(2)
         with col1:
             dni = st.text_input("DNI")
@@ -52,10 +56,13 @@ if menu == "Clientes":
         with col2:
             telefono = st.text_input("Teléfono")
             direccion = st.text_input("Dirección")
+        
         if st.form_submit_button("Guardar Cliente"):
             try:
                 supabase.table("clientes").insert({"dni": dni, "nombres": nombres, "telefono": telefono, "direccion": direccion}).execute()
                 st.success("✅ Cliente guardado")
+                # Cambiamos el número de la llave para que Streamlit dibuje un formulario totalmente nuevo (vacío)
+                st.session_state.form_key += 1
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
