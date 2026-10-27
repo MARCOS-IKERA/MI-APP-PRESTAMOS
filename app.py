@@ -9,8 +9,8 @@ st.set_page_config(page_title="EuricBank", page_icon="💰", layout="wide")
 # --- CONEXIÓN A SUPABASE (EuricBank) ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url, key)
-
+import httpx
+supabase: Client = create_client(url, key, options=httpx.Client(verify=False))
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     hoy = date.today()
