@@ -111,6 +111,7 @@ elif tipo_usuario == "Administrador":
     menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
     
     # 1. CLIENTES
+       # 1. CLIENTES
     if menu == "Clientes":
         st.header("👥 Clientes")
         
@@ -138,6 +139,33 @@ elif tipo_usuario == "Administrador":
         df_clientes = pd.DataFrame(res.data)
         st.dataframe(df_clientes, use_container_width=True)
 
+        # --- ZONA PARA EDITAR/ELIMINAR CLIENTES ---
+        if len(df_clientes) > 0:
+            st.write("---")
+            with st.expander("⚙️ Editar o Eliminar un Cliente"):
+                cliente_sel = st.selectbox("Selecciona el cliente", df_clientes['nombres'])
+                row_cli = df_clientes[df_clientes['nombres'] == cliente_sel].iloc[0]
+                
+                with st.form("editar_cliente_form"):
+                    e_dni = st.text_input("DNI", value=row_cli['dni'])
+                    e_nombres = st.text_input("Nombres", value=row_cli['nombres'])
+                    e_telefono = st.text_input("Teléfono", value=row_cli['telefono'] if row_cli['telefono'] else "")
+                    e_direccion = st.text_input("Dirección", value=row_cli['direccion'] if row_cli['direccion'] else "")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.form_submit_button("💾 Guardar Cambios"):
+                            supabase.table("clientes").update({
+                                "dni": e_dni, "nombres": e_nombres, "telefono": e_telefono, "direccion": e_direccion
+                            }).eq("id", row_cli['id']).execute()
+                            st.success("Cliente actualizado")
+                            st.rerun()
+                    with col2:
+                        if st.form_submit_button("🗑️ Eliminar Cliente"):
+                            # Al borrar el cliente, se borran sus préstamos por el ON DELETE CASCADE
+                            supabase.table("clientes").delete().eq("id", row_cli['id']).execute()
+                            st.error("Cliente eliminado.")
+                            st.rerun()
     # 2. NUEVO PRÉSTAMO
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
@@ -225,30 +253,10 @@ elif tipo_usuario == "Administrador":
                             st.rerun()
 
     # 4. CARTERA VENCIDA
-    elif menu == "Cartera Vencida":
-        st.header("🚨 Cobros en Calle")
-        res_p = supabase.table("prestamos").select("*, clientes(nombres, telefono)").eq("estado", "activo").eq("frecuencia", "Diario Fijo").execute()
-        activos = pd.DataFrame(res_p.data)
-        
-        if len(activos) == 0: st.info("No hay préstamos diarios.")
-        else:
-            total = 0
-            for _, row in activos.iterrows():
-                deuda, dias, _ = calcular_deuda_diaria(row['monto'], row['interes'], row['fecha_inicio'])
-                if dias >= 0:
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.write(f"👤 **{row['clientes']['nombres']}** | Tel: {row['clientes']['telefono']} | Días: {dias} | **Cobrar: S/ {deuda:,.2f}**")
-                    with col2:
-                        if st.button("🗑️", key=f"del_{row['id']}"):
-                            supabase.table("prestamos").delete().eq("id", row['id']).execute()
-                            st.rerun()
-                    total += deuda
-            st.metric("TOTAL A COBRAR", f"S/ {total:,.2f}")
-
-    # 5. INVERSIONISTAS
+        # 5. INVERSIONISTAS
     elif menu == "Inversionistas":
         st.header("🤝 Inversionistas")
+        
         with st.form("nuevo_inv"):
             col1, col2 = st.columns(2)
             with col1:
@@ -262,18 +270,48 @@ elif tipo_usuario == "Administrador":
                 try:
                     supabase.table("inversionistas").insert({"nombres": nom, "dni": dni_i, "capital": cap, "tasa_anual": tasa, "fecha_aporte": str(f_aporte)}).execute()
                     st.success("✅ Guardado")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
         
         res_inv = supabase.table("inversionistas").select("*").eq("estado", "activo").execute()
-        for row in res_inv.data:
-            hoy = date.today()
-            f_ini = datetime.strptime(str(row['fecha_aporte']), '%Y-%m-%d').date()
-            dias = (hoy - f_ini).days
-            ganancia = row['capital'] * (row['tasa_anual']/100) * (dias/365) if dias > 0 else 0
-            
-            st.write(f"**{row['nombres']}** | Capital: S/ {row['capital']:,.2f} | Ganancia: S/ {ganancia:,.2f}")
-            if st.button("Pagar Ganancia", key=f"pay_{row['id']}"):
-                supabase.table("inversionistas").update({"fecha_aporte": str(hoy)}).eq("id", row['id']).execute()
-                st.success("Pagado.")
-                st.rerun()
+        df_inv = pd.DataFrame(res_inv.data)
+
+        if len(df_inv) > 0:
+            for _, row in df_inv.iterrows():
+                hoy = date.today()
+                f_ini = datetime.strptime(str(row['fecha_aporte']), '%Y-%m-%d').date()
+                dias = (hoy - f_ini).days
+                ganancia = row['capital'] * (row['tasa_anual']/100) * (dias/365) if dias > 0 else 0
+                
+                st.write(f"**{row['nombres']}** | Capital: S/ {row['capital']:,.2f} | Ganancia: S/ {ganancia:,.2f}")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Pagar Ganancia", key=f"pay_{row['id']}"):
+                        supabase.table("inversionistas").update({"fecha_aporte": str(hoy)}).eq("id", row['id']).execute()
+                        st.success("Pagado.")
+                        st.rerun()
+
+                # --- ZONA PARA EDITAR/ELIMINAR INVERSIONISTAS ---
+                with st.expander("⚙️ Editar / Eliminar"):
+                    with st.form(f"edit_inv_{row['id']}"):
+                        ei_nom = st.text_input("Nombre", value=row['nombres'])
+                        ei_dni = st.text_input("DNI", value=row['dni'])
+                        ei_cap = st.number_input("Capital (S/)", value=float(row['capital']))
+                        ei_tasa = st.number_input("Tasa (%)", value=float(row['tasa_anual']))
+                        
+                        cb1, cb2 = st.columns(2)
+                        with cb1:
+                            if st.form_submit_button("💾 Guardar Cambios"):
+                                supabase.table("inversionistas").update({
+                                    "nombres": ei_nom, "dni": ei_dni, "capital": ei_cap, "tasa_anual": ei_tasa
+                                }).eq("id", row['id']).execute()
+                                st.success("Actualizado.")
+                                st.rerun()
+                        with cb2:
+                            if st.form_submit_button("🗑️ Eliminar"):
+                                supabase.table("inversionistas").delete().eq("id", row['id']).execute()
+                                st.error("Eliminado.")
+                                st.rerun()
+                st.divider()
