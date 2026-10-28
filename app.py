@@ -16,35 +16,7 @@ supabase: Client = create_client(url, key)
 st.sidebar.image("yvaNr.jpg", use_container_width=True)
 
 # --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
-tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
-
-# --- FUNCIONES DE CÁLCULO ---
-def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
-    hoy = date.today()
-    fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
-    dias_transcurridos = (hoy - fecha_ini).days
-    if dias_transcurridos < 0: return monto_inicial, 0, 0.0
-    interes_generado = interes_diario_soles * dias_transcurridos
-    monto_actual = monto_inicial + interes_generado
-    return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
-
-def calcular_cuotas(monto, tipo, valor_interes, num_cuotas, frecuencia):
-    cuotas = []
-    if tipo == "Interés Simple Mensual":
-        interes_mensual_soles = monto * (valor_interes / 100)
-        capital_por_cuota = monto / num_cuotas
-        cuota_total = capital_por_cuota + interes_mensual_soles
-        cuotas = [round(cuota_total, 2)] * num_cuotas
-    elif tipo == "Sistema Bancario (Francés)":
-        tasa_mensual = (valor_interes / 100)
-        if tasa_mensual == 0: cuotas = [round(monto / num_cuotas, 2)] * num_cuotas
-        else:
-            cuota = monto * (tasa_mensual * (1 + tasa_mensual)**num_cuotas) / ((1 + tasa_mensual)**num_cuotas - 1)
-            cuotas = [round(cuota, 2)] * num_cuotas
-    return cuotas
-
 # --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
-st.sidebar.title("🏦 EuricBank")
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
 
 # ==========================================
@@ -58,7 +30,6 @@ if tipo_usuario == "Cliente":
     
     if st.button("Consultar"):
         if dni_buscar:
-            # Buscamos al cliente
             res_cli = supabase.table("clientes").select("*").eq("dni", dni_buscar).execute()
             if len(res_cli.data) == 0:
                 st.error("❌ No se encontró ningún cliente con ese DNI.")
@@ -66,7 +37,6 @@ if tipo_usuario == "Cliente":
                 cliente = res_cli.data[0]
                 st.success(f"Bienvenido(a), {cliente['nombres']}")
                 
-                # Buscamos sus préstamos activos
                 res_p = supabase.table("prestamos").select("*").eq("cliente_id", cliente['id']).eq("estado", "activo").execute()
                 
                 if len(res_p.data) == 0:
@@ -83,7 +53,6 @@ if tipo_usuario == "Cliente":
                         else:
                             st.write(f"**Préstamo {p['frecuencia']}** (Iniciado: {p['fecha_inicio']})")
                             st.write(f"Monto: S/ {p['monto']:,.2f} | Cuotas: {p['num_cuotas']}")
-                            # Mostrar cuotas pendientes
                             res_c = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).eq("estado", "pendiente").execute()
                             if len(res_c.data) > 0:
                                 df_c = pd.DataFrame(res_c.data)
@@ -94,6 +63,26 @@ if tipo_usuario == "Cliente":
         else:
             st.warning("Por favor, ingresa tu DNI.")
 
+# ==========================================
+# PORTAL DEL ADMINISTRADOR
+# ==========================================
+elif tipo_usuario == "Administrador":
+    if "admin_logged" not in st.session_state:
+        st.session_state.admin_logged = False
+
+    if not st.session_state.admin_logged:
+        st.header("🔒 Acceso Administrador")
+        pass_admin = st.text_input("Contraseña", type="password")
+        if st.button("Ingresar"):
+            if pass_admin == "EuricBank2026": 
+                st.session_state.admin_logged = True
+                st.rerun()
+            else:
+                st.error("❌ Contraseña incorrecta")
+        st.stop()
+
+    # --- MENÚ DEL ADMINISTRADOR (¡Asegúrate de que esta línea no se haya borrado!) ---
+    menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
 # ==========================================
 # PORTAL DEL ADMINISTRADOR
 # ==========================================
