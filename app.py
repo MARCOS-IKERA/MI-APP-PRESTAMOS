@@ -4,12 +4,17 @@ from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from supabase import create_client, Client
 
-st.set_page_config(page_title="EuricBank", page_icon="💰", layout="wide")
+# --- CONFIGURACIÓN CON LOGO ---
+st.set_page_config(page_title="EuricBank", page_icon="yvaNr.jpg", layout="wide")
 
 # --- CONEXIÓN A SUPABASE ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
+
+# --- LOGO EN EL MENÚ LATERAL ---
+st.sidebar.image("yvaNr.jpg", use_container_width=True)
+st.sidebar.title("🏦 EuricBank")
 
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
