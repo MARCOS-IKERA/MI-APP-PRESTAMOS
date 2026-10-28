@@ -14,7 +14,9 @@ supabase: Client = create_client(url, key)
 
 # --- LOGO EN EL MENÚ LATERAL ---
 st.sidebar.image("yvaNr.jpg", use_container_width=True)
-st.sidebar.title("🏦 EuricBank")
+
+# --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
+tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
 
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
