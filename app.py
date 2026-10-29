@@ -67,19 +67,24 @@ if tipo_usuario == "Cliente":
 # PORTAL DEL ADMINISTRADOR
 # ==========================================
 elif tipo_usuario == "Administrador":
-    if "admin_logged" not in st.session_state:
-        st.session_state.admin_logged = False
-
-    if not st.session_state.admin_logged:
+        if not st.session_state.admin_logged:
         st.header("🔒 Acceso Administrador")
-        pass_admin = st.text_input("Contraseña", type="password")
-        if st.button("Ingresar"):
-            if pass_admin == "EuricBank2026": 
-                st.session_state.admin_logged = True
-                st.rerun()
-            else:
-                st.error("❌ Contraseña incorrecta")
-        st.stop()
+        
+        # Usamos un formulario para que no se recargue hasta que presiones el botón
+        with st.form("login_admin"):
+            pass_admin = st.text_input("Contraseña", type="password")
+            submit = st.form_submit_button("Ingresar")
+            
+            if submit:
+                if pass_admin == "EuricBank2026": 
+                    st.session_state.admin_logged = True
+                    st.rerun()
+                else:
+                    st.error("❌ Contraseña incorrecta")
+        
+        # Si no está logueado, detenemos la app aquí
+        if not st.session_state.admin_logged:
+            st.stop()
 
     # --- MENÚ DEL ADMINISTRADOR (¡Asegúrate de que esta línea no se haya borrado!) ---
     menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
