@@ -147,7 +147,7 @@ elif tipo_usuario == "Administrador":
                             st.error("Cliente eliminado.")
                             st.rerun()
 
-    # 2. NUEVO PRÉSTAMO
+    # 2. NUEVO PRÉSTAMO (SIN FORMULARIO PARA QUE SE ACTUALICE AL INSTANTE)
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
         res_cli = supabase.table("clientes").select("*").execute()
@@ -159,30 +159,30 @@ elif tipo_usuario == "Administrador":
             if "prestamo_key" not in st.session_state:
                 st.session_state.prestamo_key = 0
 
-            with st.form(f"form_prestamo_{st.session_state.prestamo_key}"):
-                clientes['opcion'] = clientes['nombres'] + " - " + clientes['dni']
-                cliente_sel = st.selectbox("Cliente", clientes['opcion'])
-                cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
-                
-                fecha_inicio = st.date_input("📅 Fecha de Desembolso", date.today())
-                
-                # AQUÍ ESTÁ LA MAGIA: Pedimos la modalidad primero
-                tipo = st.selectbox("Modalidad", ["Diario Fijo", "Simple Mensual", "Francés Mensual", "Francés Semanal"])
-                monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0)
-                
-                # Condición para mostrar los campos correctos
-                if tipo == "Diario Fijo":
-                    interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
-                    num_cuotas = 1
-                    st.info("El cobro diario es automático según los días transcurridos.")
-                else:
-                    col_int, col_cuo = st.columns(2)
-                    with col_int:
-                        interes = st.number_input("Interés Mensual (%)", min_value=0.0, help="Ejemplo: 10 si es 10% mensual")
-                    with col_cuo:
-                        num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, help="Pon la cantidad de meses o semanas.")
+            clientes['opcion'] = clientes['nombres'] + " - " + clientes['dni']
+            cliente_sel = st.selectbox("Cliente", clientes['opcion'], key=f"cli_{st.session_state.prestamo_key}")
+            cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
+            
+            fecha_inicio = st.date_input("📅 Fecha de Desembolso", date.today(), key=f"fecha_{st.session_state.prestamo_key}")
+            
+            # El selector de modalidad está afuera del formulario para que se actualice al instante
+            tipo = st.selectbox("Modalidad", ["Diario Fijo", "Simple Mensual", "Francés Mensual", "Francés Semanal"], key=f"tipo_{st.session_state.prestamo_key}")
 
-                submit_prestamo = st.form_submit_button("Generar Préstamo")
+            if tipo == "Diario Fijo":
+                monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0, key=f"monto_{st.session_state.prestamo_key}")
+                interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50, key=f"int_{st.session_state.prestamo_key}")
+                num_cuotas = 1
+                st.info("El cobro diario es automático según los días transcurridos.")
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0, key=f"monto2_{st.session_state.prestamo_key}")
+                with col2:
+                    interes = st.number_input("Interés Mensual (%)", min_value=0.0, key=f"int2_{st.session_state.prestamo_key}")
+                
+                num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, key=f"cuo_{st.session_state.prestamo_key}")
+
+            submit_prestamo = st.button("Generar Préstamo")
 
             if submit_prestamo:
                 res_p = supabase.table("prestamos").insert({
@@ -216,7 +216,6 @@ elif tipo_usuario == "Administrador":
                         }).execute()
 
                 elif tipo == "Francés Semanal":
-                    # El usuario ingresa interés MENSUAL, lo dividimos entre 4 para la tasa SEMANAL
                     tasa_semanal = (interes / 100) / 4 
                     if tasa_semanal == 0:
                         cuota_fija = monto / num_cuotas
@@ -224,7 +223,7 @@ elif tipo_usuario == "Administrador":
                         cuota_fija = monto * (tasa_semanal * (1 + tasa_semanal)**num_cuotas) / ((1 + tasa_semanal)**num_cuotas - 1)
                     
                     for i in range(1, int(num_cuotas)+1):
-                        fv = fecha_inicio + relativedelta(weeks=i) # Cobro cada 7 días
+                        fv = fecha_inicio + relativedelta(weeks=i)
                         supabase.table("cuotas").insert({
                             "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
                         }).execute()
