@@ -15,7 +15,31 @@ supabase: Client = create_client(url, key)
 # --- LOGO EN EL MENÚ LATERAL ---
 st.sidebar.image("yvaNr.jpg", use_container_width=True)
 
-# --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
+# --- FUNCIONES DE CÁLCULO ---
+def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
+    hoy = date.today()
+    fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
+    dias_transcurridos = (hoy - fecha_ini).days
+    if dias_transcurridos < 0: return monto_inicial, 0, 0.0
+    interes_generado = interes_diario_soles * dias_transcurridos
+    monto_actual = monto_inicial + interes_generado
+    return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
+
+def calcular_cuotas(monto, tipo, valor_interes, num_cuotas, frecuencia):
+    cuotas = []
+    if tipo == "Interés Simple Mensual":
+        interes_mensual_soles = monto * (valor_interes / 100)
+        capital_por_cuota = monto / num_cuotas
+        cuota_total = capital_por_cuota + interes_mensual_soles
+        cuotas = [round(cuota_total, 2)] * num_cuotas
+    elif tipo == "Sistema Bancario (Francés)":
+        tasa_mensual = (valor_interes / 100)
+        if tasa_mensual == 0: cuotas = [round(monto / num_cuotas, 2)] * num_cuotas
+        else:
+            cuota = monto * (tasa_mensual * (1 + tasa_mensual)**num_cuotas) / ((1 + tasa_mensual)**num_cuotas - 1)
+            cuotas = [round(cuota, 2)] * num_cuotas
+    return cuotas
+
 # --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
 
@@ -57,7 +81,7 @@ if tipo_usuario == "Cliente":
                             if len(res_c.data) > 0:
                                 df_c = pd.DataFrame(res_c.data)
                                 st.write("Cuotas pendientes:")
-                                st.dataframe(df_c[['numero', 'monto', 'fecha_vence']], use_container_width=True)
+                                st.table(df_c[['numero', 'monto', 'fecha_vence']])
                             else:
                                 st.success("Este préstamo ya está pagado.")
         else:
@@ -67,33 +91,7 @@ if tipo_usuario == "Cliente":
 # PORTAL DEL ADMINISTRADOR
 # ==========================================
 elif tipo_usuario == "Administrador":
-        if not st.session_state.admin_logged:
-        st.header ("🔒 Acceso Administrador")
-        
-        # Usamos un formulario para que no se recargue hasta que presiones el botón
-        with st.form("login_admin"):
-            pass_admin = st.text_input("Contraseña", type="password")
-            submit = st.form_submit_button("Ingresar")
-            
-            if submit:
-                if pass_admin == "EuricBank2026": 
-                    st.session_state.admin_logged = True
-                    st.rerun()
-                else:
-                    st.error("❌ Contraseña incorrecta")
-        
-        # Si no está logueado, detenemos la app aquí
-        if not st.session_state.admin_logged:
-            st.stop()
-
-    # --- MENÚ DEL ADMINISTRADOR (¡Asegúrate de que esta línea no se haya borrado!) ---
-    menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
-# ==========================================
-# PORTAL DEL ADMINISTRADOR
-# ==========================================
-elif tipo_usuario == "Administrador":
-    # Contraseña de administrador
-        if "admin_logged" not in st.session_state:
+    if "admin_logged" not in st.session_state:
         st.session_state.admin_logged = False
 
     if not st.session_state.admin_logged:
@@ -106,11 +104,11 @@ elif tipo_usuario == "Administrador":
             else:
                 st.error("❌ Contraseña incorrecta")
         st.stop()
+
     # --- MENÚ DEL ADMINISTRADOR ---
     menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
     
     # 1. CLIENTES
-       # 1. CLIENTES
     if menu == "Clientes":
         st.header("👥 Clientes")
         
@@ -136,7 +134,7 @@ elif tipo_usuario == "Administrador":
 
         res = supabase.table("clientes").select("*").execute()
         df_clientes = pd.DataFrame(res.data)
-        st.dataframe(df_clientes, use_container_width=True)
+        st.table(df_clientes)
 
         # --- ZONA PARA EDITAR/ELIMINAR CLIENTES ---
         if len(df_clientes) > 0:
@@ -161,10 +159,10 @@ elif tipo_usuario == "Administrador":
                             st.rerun()
                     with col2:
                         if st.form_submit_button("🗑️ Eliminar Cliente"):
-                            # Al borrar el cliente, se borran sus préstamos por el ON DELETE CASCADE
                             supabase.table("clientes").delete().eq("id", row_cli['id']).execute()
                             st.error("Cliente eliminado.")
                             st.rerun()
+
     # 2. NUEVO PRÉSTAMO
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
@@ -252,10 +250,30 @@ elif tipo_usuario == "Administrador":
                             st.rerun()
 
     # 4. CARTERA VENCIDA
-        # 5. INVERSIONISTAS
+    elif menu == "Cartera Vencida":
+        st.header("🚨 Cobros en Calle")
+        res_p = supabase.table("prestamos").select("*, clientes(nombres, telefono)").eq("estado", "activo").eq("frecuencia", "Diario Fijo").execute()
+        activos = pd.DataFrame(res_p.data)
+        
+        if len(activos) == 0: st.info("No hay préstamos diarios.")
+        else:
+            total = 0
+            for _, row in activos.iterrows():
+                deuda, dias, _ = calcular_deuda_diaria(row['monto'], row['interes'], row['fecha_inicio'])
+                if dias >= 0:
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.write(f"👤 **{row['clientes']['nombres']}** | Tel: {row['clientes']['telefono']} | Días: {dias} | **Cobrar: S/ {deuda:,.2f}**")
+                    with col2:
+                        if st.button("🗑️", key=f"del_{row['id']}"):
+                            supabase.table("prestamos").delete().eq("id", row['id']).execute()
+                            st.rerun()
+                    total += deuda
+            st.metric("TOTAL A COBRAR", f"S/ {total:,.2f}")
+
+    # 5. INVERSIONISTAS
     elif menu == "Inversionistas":
         st.header("🤝 Inversionistas")
-        
         with st.form("nuevo_inv"):
             col1, col2 = st.columns(2)
             with col1:
@@ -292,7 +310,6 @@ elif tipo_usuario == "Administrador":
                         st.success("Pagado.")
                         st.rerun()
 
-                # --- ZONA PARA EDITAR/ELIMINAR INVERSIONISTAS ---
                 with st.expander("⚙️ Editar / Eliminar"):
                     with st.form(f"edit_inv_{row['id']}"):
                         ei_nom = st.text_input("Nombre", value=row['nombres'])
