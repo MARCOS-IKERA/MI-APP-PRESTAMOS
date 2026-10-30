@@ -199,13 +199,20 @@ elif tipo_usuario == "Administrador":
                 if tipo == "Diario Fijo":
                     supabase.table("cuotas").insert({"prestamo_id": prestamo_id, "numero": 1, "monto": monto, "fecha_vence": str(fecha_inicio)}).execute()
                 else:
-                    cuotas_calc = calcular_cuotas(monto, tipo, interes, int(num_cuotas), "Mensual")
+                                        tasa_mensual = (interes / 100)
+                    if tasa_mensual == 0:
+                        cuota_fija = monto / num_cuotas
+                    else:
+                        cuota_fija = monto * (tasa_mensual * (1 + tasa_mensual)**num_cuotas) / ((1 + tasa_mensual)**num_cuotas - 1)
+                    
                     for i in range(1, int(num_cuotas)+1):
                         fv = fecha_inicio + relativedelta(months=i)
                         supabase.table("cuotas").insert({
-                            "prestamo_id": prestamo_id, "numero": i, "monto": cuotas_calc[i-1], "fecha_vence": str(fv)
+                            "prestamo_id": prestamo_id, 
+                            "numero": i, 
+                            "monto": round(cuota_fija, 2), 
+                            "fecha_vence": str(fv)
                         }).execute()
-                st.success("✅ Préstamo registrado.")
 
     # 3. CRONOGRAMA Y PAGOS
     elif menu == "Cronograma y Pagos":
