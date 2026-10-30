@@ -174,8 +174,8 @@ elif tipo_usuario == "Administrador":
                         interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
                         num_cuotas = 1
                     else:
-                        interes = st.number_input("Interés (%)", min_value=0.0)
-                        num_cuotas = st.number_input("N° Cuotas", min_value=1)
+                        interes = st.number_input("Interés Mensual (%)", min_value=0.0, help="Ejemplo: 10 si es 10% mensual")
+                        num_cuotas = st.number_input("N° Cuotas (Semanas/Meses)", min_value=1)
 
                 submit_prestamo = st.form_submit_button("Generar Préstamo")
 
@@ -211,7 +211,7 @@ elif tipo_usuario == "Administrador":
                         }).execute()
 
                 elif tipo == "Francés Semanal":
-                    # Convertimos la tasa mensual a tasa semanal (dividiendo entre 4)
+                    # El usuario ingresa interés MENSUAL, lo dividimos entre 4 para la tasa SEMANAL
                     tasa_semanal = (interes / 100) / 4 
                     if tasa_semanal == 0:
                         cuota_fija = monto / num_cuotas
@@ -219,7 +219,7 @@ elif tipo_usuario == "Administrador":
                         cuota_fija = monto * (tasa_semanal * (1 + tasa_semanal)**num_cuotas) / ((1 + tasa_semanal)**num_cuotas - 1)
                     
                     for i in range(1, int(num_cuotas)+1):
-                        fv = fecha_inicio + relativedelta(weeks=i) # Vencimiento semanal
+                        fv = fecha_inicio + relativedelta(weeks=i) # Cobro cada 7 días
                         supabase.table("cuotas").insert({
                             "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
                         }).execute()
