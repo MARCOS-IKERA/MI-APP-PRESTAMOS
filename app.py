@@ -68,7 +68,7 @@ if tipo_usuario == "Cliente":
 # ==========================================
 elif tipo_usuario == "Administrador":
         if not st.session_state.admin_logged:
-        st.header("🔒 Acceso Administrador")
+        st.header ("🔒 Acceso Administrador")
         
         # Usamos un formulario para que no se recargue hasta que presiones el botón
         with st.form("login_admin"):
