@@ -26,7 +26,6 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
 
 def calcular_cuota_frances(monto, tasa_interes, num_cuotas):
-    # Retorna la cuota fija
     if tasa_interes == 0:
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
@@ -153,7 +152,7 @@ elif tipo_usuario == "Administrador":
                             st.error("Cliente eliminado.")
                             st.rerun()
 
-    # 2. NUEVO PRÉSTAMO (CON VISTA PREVIA)
+    # 2. NUEVO PRÉSTAMO
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
         res_cli = supabase.table("clientes").select("*").execute()
@@ -192,14 +191,18 @@ elif tipo_usuario == "Administrador":
                 if tipo == "Simple Mensual":
                     cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
                     total_pagar = cuota_fija * num_cuotas
+                
                 elif tipo == "Francés Mensual":
                     cuota_fija = calcular_cuota_frances(monto, (interes / 100), num_cuotas)
                     total_pagar = cuota_fija * num_cuotas
+                
                 elif tipo == "Francés Semanal":
-                    # Tu regla: Interés mensual / 4 semanas
-                    tasa_semanal = (interes / 100) / 4 
-                    cuota_fija = calcular_cuota_frances(monto, tasa_semanal, num_cuotas)
-                    total_pagar = cuota_fija * num_cuotas
+                    # --- LÓGICA CORREGIDA: Calcula interés mensual y divide en semanas exactas ---
+                    # Si son 4 cuotas (4 semanas), eso equivale a 1 mes.
+                    meses_equivalentes = num_cuotas / 4
+                    interes_total = monto * (interes / 100) * meses_equivalentes
+                    total_pagar = monto + interes_total
+                    cuota_fija = total_pagar / num_cuotas
 
                 # Mostramos el resumen antes de guardar
                 st.write("---")
