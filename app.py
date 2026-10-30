@@ -147,7 +147,7 @@ elif tipo_usuario == "Administrador":
                             st.error("Cliente eliminado.")
                             st.rerun()
 
-    # 2. NUEVO PRÉSTAMO
+    # 2. NUEVO PRÉSTAMO (CON LIMPIEZA AUTOMÁTICA)
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
         res_cli = supabase.table("clientes").select("*").execute()
@@ -156,24 +156,31 @@ elif tipo_usuario == "Administrador":
         if len(clientes) == 0:
             st.warning("⚠️ Registra un cliente primero.")
         else:
-            clientes['opcion'] = clientes['nombres'] + " - " + clientes['dni']
-            cliente_sel = st.selectbox("Cliente", clientes['opcion'])
-            cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
-            
-            fecha_inicio = st.date_input("📅 Fecha", date.today())
-            col1, col2 = st.columns(2)
-            with col1:
-                tipo = st.selectbox("Tipo", ["Diario Fijo", "Simple Mensual", "Francés"])
-                monto = st.number_input("Monto (S/)", min_value=10.0, step=100.0)
-            with col2:
-                if tipo == "Diario Fijo":
-                    interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
-                    num_cuotas = 1
-                else:
-                    interes = st.number_input("Interés (%)", min_value=0.0)
-                    num_cuotas = st.number_input("N° Cuotas", min_value=1)
+            # Usamos una llave (form_key) para poder limpiar el formulario después de guardar
+            if "prestamo_key" not in st.session_state:
+                st.session_state.prestamo_key = 0
 
-            if st.button("Generar Préstamo"):
+            with st.form(f"form_prestamo_{st.session_state.prestamo_key}"):
+                clientes['opcion'] = clientes['nombres'] + " - " + clientes['dni']
+                cliente_sel = st.selectbox("Cliente", clientes['opcion'])
+                cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
+                
+                fecha_inicio = st.date_input("📅 Fecha", date.today())
+                col1, col2 = st.columns(2)
+                with col1:
+                    tipo = st.selectbox("Tipo", ["Diario Fijo", "Simple Mensual", "Francés"])
+                    monto = st.number_input("Monto (S/)", min_value=10.0, step=100.0)
+                with col2:
+                    if tipo == "Diario Fijo":
+                        interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
+                        num_cuotas = 1
+                    else:
+                        interes = st.number_input("Interés (%)", min_value=0.0)
+                        num_cuotas = st.number_input("N° Cuotas", min_value=1)
+
+                submit_prestamo = st.form_submit_button("Generar Préstamo")
+
+            if submit_prestamo:
                 res_p = supabase.table("prestamos").insert({
                     "cliente_id": cliente_id, "monto": monto, "interes": interes, 
                     "num_cuotas": num_cuotas, "frecuencia": tipo, "fecha_inicio": str(fecha_inicio)
@@ -204,9 +211,11 @@ elif tipo_usuario == "Administrador":
                             "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
                         }).execute()
                 
-                st.success("✅ Préstamo registrado.")
+                st.success("✅ Préstamo registrado exitosamente.")
+                st.session_state.prestamo_key += 1 # Esto limpia el formulario
+                st.rerun()
 
-    # 3. CRONOGRAMA Y PAGOS
+    # 3. CRONOGRAMA Y PAGOS (CON ALERTAS DE VENCIMIENTO)
     elif menu == "Cronograma y Pagos":
         st.header("📅 Estado de Cuentas")
         res_p = supabase.table("prestamos").select("*, clientes(nombres)").eq("estado", "activo").execute()
@@ -236,25 +245,44 @@ elif tipo_usuario == "Administrador":
                     st.success("Saldado.")
                     st.rerun()
             else:
+                # --- ALERTA DE CUOTAS VENCIDAS (Simple y Francés) ---
                 res_c = supabase.table("cuotas").select("*").eq("prestamo_id", id_p).order("numero").execute()
+                hoy = date.today()
+                cuotas_vencidas = 0
+                
                 for row in res_c.data:
                     col1, col2, col3, col4 = st.columns(4)
                     col1.write(f"**Cuota {row['numero']}**")
                     col2.write(f"S/ {row['monto']}")
                     col3.write(f"Vence: {row['fecha_vence']}")
-                    if row['estado'] == 'pagado': col4.success("PAGADO")
+                    
+                    if row['estado'] == 'pagado': 
+                        col4.success("PAGADO")
                     else:
+                        f_vence = datetime.strptime(str(row['fecha_vence']), '%Y-%m-%d').date()
+                        dias_atraso = (hoy - f_vence).days
+                        
+                        if dias_atraso > 0:
+                            col4.error(f"⚠️ VENCIDO ({dias_atraso} días)")
+                            cuotas_vencidas += 1
+                        else:
+                            col4.info("⏳ Pendiente")
+                        
                         if st.button(f"Cobrar Cuota {row['numero']}", key=f"b_{row['id']}"):
                             supabase.table("cuotas").update({"estado": "pagado"}).eq("id", row['id']).execute()
                             st.rerun()
+                
+                # Mensaje de alerta general si hay cuotas vencidas
+                if cuotas_vencidas > 0:
+                    st.warning(f"🚨 ¡Atención! Este cliente tiene {cuotas_vencidas} cuota(s) vencida(s) pendientes de pago.")
 
     # 4. CARTERA VENCIDA
     elif menu == "Cartera Vencida":
-        st.header("🚨 Cobros en Calle")
+        st.header("🚨 Cobros en Calle (Préstamos Diarios)")
         res_p = supabase.table("prestamos").select("*, clientes(nombres, telefono)").eq("estado", "activo").eq("frecuencia", "Diario Fijo").execute()
         activos = pd.DataFrame(res_p.data)
         
-        if len(activos) == 0: st.info("No hay préstamos diarios.")
+        if len(activos) == 0: st.info("No hay préstamos diarios activos.")
         else:
             total = 0
             for _, row in activos.iterrows():
@@ -268,7 +296,7 @@ elif tipo_usuario == "Administrador":
                             supabase.table("prestamos").delete().eq("id", row['id']).execute()
                             st.rerun()
                     total += deuda
-            st.metric("TOTAL A COBRAR", f"S/ {total:,.2f}")
+            st.metric("TOTAL A COBRAR EN CALLE", f"S/ {total:,.2f}")
 
     # 5. INVERSIONISTAS
     elif menu == "Inversionistas":
