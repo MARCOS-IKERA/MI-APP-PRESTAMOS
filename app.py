@@ -25,21 +25,6 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
 
-def calcular_cuotas(monto, tipo, valor_interes, num_cuotas, frecuencia):
-    cuotas = []
-    if tipo == "Interés Simple Mensual":
-        interes_mensual_soles = monto * (valor_interes / 100)
-        capital_por_cuota = monto / num_cuotas
-        cuota_total = capital_por_cuota + interes_mensual_soles
-        cuotas = [round(cuota_total, 2)] * num_cuotas
-    elif tipo == "Sistema Bancario (Francés)":
-        tasa_mensual = (valor_interes / 100)
-        if tasa_mensual == 0: cuotas = [round(monto / num_cuotas, 2)] * num_cuotas
-        else:
-            cuota = monto * (tasa_mensual * (1 + tasa_mensual)**num_cuotas) / ((1 + tasa_mensual)**num_cuotas - 1)
-            cuotas = [round(cuota, 2)] * num_cuotas
-    return cuotas
-
 # --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
 
@@ -136,7 +121,6 @@ elif tipo_usuario == "Administrador":
         df_clientes = pd.DataFrame(res.data)
         st.table(df_clientes)
 
-        # --- ZONA PARA EDITAR/ELIMINAR CLIENTES ---
         if len(df_clientes) > 0:
             st.write("---")
             with st.expander("⚙️ Editar o Eliminar un Cliente"):
@@ -198,8 +182,17 @@ elif tipo_usuario == "Administrador":
                 
                 if tipo == "Diario Fijo":
                     supabase.table("cuotas").insert({"prestamo_id": prestamo_id, "numero": 1, "monto": monto, "fecha_vence": str(fecha_inicio)}).execute()
-                else:
-                                        tasa_mensual = (interes / 100)
+                
+                elif tipo == "Simple Mensual":
+                    cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
+                    for i in range(1, int(num_cuotas)+1):
+                        fv = fecha_inicio + relativedelta(months=i)
+                        supabase.table("cuotas").insert({
+                            "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
+                        }).execute()
+                
+                elif tipo == "Francés":
+                    tasa_mensual = (interes / 100)
                     if tasa_mensual == 0:
                         cuota_fija = monto / num_cuotas
                     else:
@@ -208,11 +201,10 @@ elif tipo_usuario == "Administrador":
                     for i in range(1, int(num_cuotas)+1):
                         fv = fecha_inicio + relativedelta(months=i)
                         supabase.table("cuotas").insert({
-                            "prestamo_id": prestamo_id, 
-                            "numero": i, 
-                            "monto": round(cuota_fija, 2), 
-                            "fecha_vence": str(fv)
+                            "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
                         }).execute()
+                
+                st.success("✅ Préstamo registrado.")
 
     # 3. CRONOGRAMA Y PAGOS
     elif menu == "Cronograma y Pagos":
