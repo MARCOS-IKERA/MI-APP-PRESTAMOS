@@ -165,21 +165,22 @@ elif tipo_usuario == "Administrador":
                 cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
                 
                 fecha_inicio = st.date_input("📅 Fecha de Desembolso", date.today())
-                col1, col2 = st.columns(2)
                 
-                with col1:
-                    tipo = st.selectbox("Modalidad", ["Diario Fijo", "Simple Mensual", "Francés Mensual", "Francés Semanal"])
-                    monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0)
+                # AQUÍ ESTÁ LA MAGIA: Pedimos la modalidad primero
+                tipo = st.selectbox("Modalidad", ["Diario Fijo", "Simple Mensual", "Francés Mensual", "Francés Semanal"])
+                monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0)
                 
-                with col2:
-                    if tipo == "Diario Fijo":
-                        interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
-                        # Para diario no se piden cuotas
-                        num_cuotas = 1
-                        st.info("El cobro diario es automático según los días transcurridos.")
-                    else:
+                # Condición para mostrar los campos correctos
+                if tipo == "Diario Fijo":
+                    interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50)
+                    num_cuotas = 1
+                    st.info("El cobro diario es automático según los días transcurridos.")
+                else:
+                    col_int, col_cuo = st.columns(2)
+                    with col_int:
                         interes = st.number_input("Interés Mensual (%)", min_value=0.0, help="Ejemplo: 10 si es 10% mensual")
-                        num_cuotas = st.number_input("N° Cuotas", min_value=1, help="Pon la cantidad de meses o semanas que desea pagar.")
+                    with col_cuo:
+                        num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, help="Pon la cantidad de meses o semanas.")
 
                 submit_prestamo = st.form_submit_button("Generar Préstamo")
 
