@@ -93,21 +93,19 @@ elif tipo_usuario == "Administrador":
 # ==========================================
 elif tipo_usuario == "Administrador":
     # Contraseña de administrador
-    if "admin_logged" not in st.session_state:
+        if "admin_logged" not in st.session_state:
         st.session_state.admin_logged = False
 
     if not st.session_state.admin_logged:
         st.header("🔒 Acceso Administrador")
-        pass_admin = st.text_input("Contraseña", type="password")
+        pass_admin = st.text_input("Contraseña", type="password", key="pass_adm")
         if st.button("Ingresar"):
-            # CAMBIA "EuricBank2026" por la clave que tú quieras
             if pass_admin == "EuricBank2026": 
                 st.session_state.admin_logged = True
                 st.rerun()
             else:
                 st.error("❌ Contraseña incorrecta")
-        st.stop() # Detiene la app si no se ha logueado
-
+        st.stop()
     # --- MENÚ DEL ADMINISTRADOR ---
     menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
     
