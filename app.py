@@ -21,12 +21,11 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
-    # Fórmula: (Monto / 100) * Interés Diario * Días
     interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
 
-def calcular_cuota_frances(monto, tasa_interes, num_cuotas):
+def calcular_cuota(monto, tasa_interes, num_cuotas):
     if tasa_interes == 0:
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
@@ -35,7 +34,7 @@ def calcular_cuota_frances(monto, tasa_interes, num_cuotas):
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente", "Simulador"])
 
 # ==========================================
-# 1. PORTAL DEL CLIENTE (CONSULTA POR DNI O NOMBRE)
+# 1. PORTAL DEL CLIENTE
 # ==========================================
 if tipo_usuario == "Cliente":
     st.header("🔍 Consulta tu Deuda")
@@ -87,23 +86,22 @@ if tipo_usuario == "Cliente":
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS (CON TUS REGLAS EXACTAS)
+# 2. SIMULADOR DE PRÉSTAMOS
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
     st.write("Calcula tu cuota estimada. El interés ya está configurado por EuricBank.")
     
-    tipo = st.selectbox("Modalidad de Pago", ["Simple Mensual", "Francés Mensual", "Francés Semanal", "Diario Fijo"])
+    # CAMBIAMOS LOS NOMBRES AQUÍ
+    tipo = st.selectbox("Modalidad de Pago", ["Mensual", "Semanal", "Diario Fijo"])
     
-    # Tasas fijas exactas
-    TASA_FIJA_MENSUAL = 10.0  # 10% mensual
-    TASA_DIARIA_POR_CIEN = 0.50 # 0.50 céntimos por cada 100 soles al día
+    TASA_FIJA_MENSUAL = 10.0  
+    TASA_DIARIA_POR_CIEN = 0.50 
 
     if tipo == "Diario Fijo":
         monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
         dias = st.number_input("¿Para cuántos días?", min_value=1, value=10)
         
-        # Cálculo diario exacto
         interes_gen = (monto / 100) * TASA_DIARIA_POR_CIEN * dias
         total = monto + interes_gen
         
@@ -117,19 +115,15 @@ elif tipo_usuario == "Simulador":
 
     else:
         monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
-        num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, value=4)
+        num_cuotas = st.number_input("N° de Cuotas", min_value=1, value=4)
         
         interes = TASA_FIJA_MENSUAL
         
-        if tipo == "Simple Mensual":
-            cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
+        if tipo == "Mensual":
+            cuota_fija = calcular_cuota(monto, (interes / 100), num_cuotas)
             total_pagar = cuota_fija * num_cuotas
             
-        elif tipo == "Francés Mensual":
-            cuota_fija = calcular_cuota_frances(monto, (interes / 100), num_cuotas)
-            total_pagar = cuota_fija * num_cuotas
-            
-        elif tipo == "Francés Semanal":
+        elif tipo == "Semanal":
             meses_equivalentes = num_cuotas / 4
             interes_total = monto * (interes / 100) * meses_equivalentes
             total_pagar = monto + interes_total
@@ -235,7 +229,9 @@ elif tipo_usuario == "Administrador":
             cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
             
             fecha_inicio = st.date_input("📅 Fecha de Desembolso", date.today(), key=f"fecha_{st.session_state.prestamo_key}")
-            tipo = st.selectbox("Modalidad", ["Diario Fijo", "Simple Mensual", "Francés Mensual", "Francés Semanal"], key=f"tipo_{st.session_state.prestamo_key}")
+            
+            # CAMBIAMOS LOS NOMBRES AQUÍ TAMBIÉN
+            tipo = st.selectbox("Modalidad", ["Diario Fijo", "Mensual", "Semanal"], key=f"tipo_{st.session_state.prestamo_key}")
 
             if tipo == "Diario Fijo":
                 monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0, key=f"monto_{st.session_state.prestamo_key}")
@@ -243,7 +239,7 @@ elif tipo_usuario == "Administrador":
                 num_cuotas = 1
                 st.info("El cobro diario es automático según los días transcurridos.")
                 cuota_fija = monto
-                total_pagar = monto # Se recalcula en la vista de deudas
+                total_pagar = monto 
             else:
                 col1, col2 = st.columns(2)
                 with col1:
@@ -251,17 +247,13 @@ elif tipo_usuario == "Administrador":
                 with col2:
                     interes = st.number_input("Interés Mensual (%)", min_value=0.0, key=f"int2_{st.session_state.prestamo_key}")
                 
-                num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, key=f"cuo_{st.session_state.prestamo_key}")
+                num_cuotas = st.number_input("N° de Cuotas", min_value=1, key=f"cuo_{st.session_state.prestamo_key}")
 
-                if tipo == "Simple Mensual":
-                    cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
+                if tipo == "Mensual":
+                    cuota_fija = calcular_cuota(monto, (interes / 100), num_cuotas)
                     total_pagar = cuota_fija * num_cuotas
                 
-                elif tipo == "Francés Mensual":
-                    cuota_fija = calcular_cuota_frances(monto, (interes / 100), num_cuotas)
-                    total_pagar = cuota_fija * num_cuotas
-                
-                elif tipo == "Francés Semanal":
+                elif tipo == "Semanal":
                     meses_equivalentes = num_cuotas / 4
                     interes_total = monto * (interes / 100) * meses_equivalentes
                     total_pagar = monto + interes_total
@@ -286,21 +278,14 @@ elif tipo_usuario == "Administrador":
                 if tipo == "Diario Fijo":
                     supabase.table("cuotas").insert({"prestamo_id": prestamo_id, "numero": 1, "monto": monto, "fecha_vence": str(fecha_inicio)}).execute()
                 
-                elif tipo == "Simple Mensual":
+                elif tipo == "Mensual":
                     for i in range(1, int(num_cuotas)+1):
                         fv = fecha_inicio + relativedelta(months=i)
                         supabase.table("cuotas").insert({
                             "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
                         }).execute()
                 
-                elif tipo == "Francés Mensual":
-                    for i in range(1, int(num_cuotas)+1):
-                        fv = fecha_inicio + relativedelta(months=i)
-                        supabase.table("cuotas").insert({
-                            "prestamo_id": prestamo_id, "numero": i, "monto": round(cuota_fija, 2), "fecha_vence": str(fv)
-                        }).execute()
-
-                elif tipo == "Francés Semanal":
+                elif tipo == "Semanal":
                     for i in range(1, int(num_cuotas)+1):
                         fv = fecha_inicio + relativedelta(weeks=i)
                         supabase.table("cuotas").insert({
