@@ -21,7 +21,8 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
-    interes_generado = interes_diario_soles * dias_transcurridos
+    # Fórmula: (Monto / 100) * Interés Diario * Días
+    interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
 
@@ -31,24 +32,32 @@ def calcular_cuota_frances(monto, tasa_interes, num_cuotas):
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
 
 # --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
-tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente"])
+tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente", "Simulador"])
 
 # ==========================================
-# PORTAL DEL CLIENTE (CONSULTA DE DEUDA)
+# 1. PORTAL DEL CLIENTE (CONSULTA POR DNI O NOMBRE)
 # ==========================================
 if tipo_usuario == "Cliente":
     st.header("🔍 Consulta tu Deuda")
-    st.write("Ingresa tu número de DNI para ver el estado de tus préstamos.")
+    st.write("Ingresa tu DNI o tu Nombre para ver el estado de tus préstamos.")
     
-    dni_buscar = st.text_input("DNI:", key="dni_cliente_buscar")
+    busqueda = st.text_input("DNI o Nombre:")
     
     if st.button("Consultar"):
-        if dni_buscar:
-            res_cli = supabase.table("clientes").select("*").eq("dni", dni_buscar).execute()
+        if busqueda:
+            res_cli = supabase.table("clientes").select("*").or_(f"dni.eq.{busqueda},nombres.ilike.%{busqueda}%").execute()
+            
             if len(res_cli.data) == 0:
-                st.error("❌ No se encontró ningún cliente con ese DNI.")
+                st.error("❌ No se encontró ningún cliente con ese DNI o Nombre.")
             else:
-                cliente = res_cli.data[0]
+                if len(res_cli.data) > 1:
+                    nombres_encontrados = [f"{c['nombres']} (DNI: {c['dni']})" for c in res_cli.data]
+                    seleccion = st.selectbox("Se encontraron varios clientes. Selecciona el tuyo:", nombres_encontrados)
+                    index = nombres_encontrados.index(seleccion)
+                    cliente = res_cli.data[index]
+                else:
+                    cliente = res_cli.data[0]
+                
                 st.success(f"Bienvenido(a), {cliente['nombres']}")
                 
                 res_p = supabase.table("prestamos").select("*").eq("cliente_id", cliente['id']).eq("estado", "activo").execute()
@@ -75,10 +84,67 @@ if tipo_usuario == "Cliente":
                             else:
                                 st.success("Este préstamo ya está pagado.")
         else:
-            st.warning("Por favor, ingresa tu DNI.")
+            st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# PORTAL DEL ADMINISTRADOR
+# 2. SIMULADOR DE PRÉSTAMOS (CON TUS REGLAS EXACTAS)
+# ==========================================
+elif tipo_usuario == "Simulador":
+    st.header("🧮 Simulador de Préstamos")
+    st.write("Calcula tu cuota estimada. El interés ya está configurado por EuricBank.")
+    
+    tipo = st.selectbox("Modalidad de Pago", ["Simple Mensual", "Francés Mensual", "Francés Semanal", "Diario Fijo"])
+    
+    # Tasas fijas exactas
+    TASA_FIJA_MENSUAL = 10.0  # 10% mensual
+    TASA_DIARIA_POR_CIEN = 0.50 # 0.50 céntimos por cada 100 soles al día
+
+    if tipo == "Diario Fijo":
+        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
+        dias = st.number_input("¿Para cuántos días?", min_value=1, value=10)
+        
+        # Cálculo diario exacto
+        interes_gen = (monto / 100) * TASA_DIARIA_POR_CIEN * dias
+        total = monto + interes_gen
+        
+        st.write("---")
+        st.subheader("👁️ Tu Simulación")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Capital", f"S/ {monto:,.2f}")
+        c2.metric("Interés Generado", f"S/ {interes_gen:,.2f}")
+        c3.metric("TOTAL A PAGAR", f"S/ {total:,.2f}")
+        st.info(f"* Simulación calculada con un interés de S/ {TASA_DIARIA_POR_CIEN} por cada 100 soles al día.")
+
+    else:
+        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
+        num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, value=4)
+        
+        interes = TASA_FIJA_MENSUAL
+        
+        if tipo == "Simple Mensual":
+            cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
+            total_pagar = cuota_fija * num_cuotas
+            
+        elif tipo == "Francés Mensual":
+            cuota_fija = calcular_cuota_frances(monto, (interes / 100), num_cuotas)
+            total_pagar = cuota_fija * num_cuotas
+            
+        elif tipo == "Francés Semanal":
+            meses_equivalentes = num_cuotas / 4
+            interes_total = monto * (interes / 100) * meses_equivalentes
+            total_pagar = monto + interes_total
+            cuota_fija = total_pagar / num_cuotas
+
+        st.write("---")
+        st.subheader("👁️ Tu Simulación")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Cuota a Pagar", f"S/ {round(cuota_fija, 2):,.2f}")
+        c2.metric("Total Intereses", f"S/ {round(total_pagar - monto, 2):,.2f}")
+        c3.metric("Total a Pagar", f"S/ {round(total_pagar, 2):,.2f}")
+        st.info(f"* Simulación calculada con un interés mensual del {TASA_FIJA_MENSUAL}%")
+
+# ==========================================
+# 3. PORTAL DEL ADMINISTRADOR
 # ==========================================
 elif tipo_usuario == "Administrador":
     if "admin_logged" not in st.session_state:
@@ -173,11 +239,11 @@ elif tipo_usuario == "Administrador":
 
             if tipo == "Diario Fijo":
                 monto = st.number_input("Monto Prestado (S/)", min_value=10.0, step=100.0, key=f"monto_{st.session_state.prestamo_key}")
-                interes = st.number_input("Interés Diario (S/)", min_value=0.10, value=2.50, key=f"int_{st.session_state.prestamo_key}")
+                interes = st.number_input("Interés Diario (S/ por cada 100)", min_value=0.10, value=0.50, key=f"int_{st.session_state.prestamo_key}")
                 num_cuotas = 1
                 st.info("El cobro diario es automático según los días transcurridos.")
                 cuota_fija = monto
-                total_pagar = monto
+                total_pagar = monto # Se recalcula en la vista de deudas
             else:
                 col1, col2 = st.columns(2)
                 with col1:
@@ -187,7 +253,6 @@ elif tipo_usuario == "Administrador":
                 
                 num_cuotas = st.number_input("N° de Cuotas (Meses o Semanas)", min_value=1, key=f"cuo_{st.session_state.prestamo_key}")
 
-                # --- VISTA PREVIA DEL CÁLCULO ---
                 if tipo == "Simple Mensual":
                     cuota_fija = (monto / num_cuotas) + (monto * (interes / 100))
                     total_pagar = cuota_fija * num_cuotas
@@ -197,14 +262,11 @@ elif tipo_usuario == "Administrador":
                     total_pagar = cuota_fija * num_cuotas
                 
                 elif tipo == "Francés Semanal":
-                    # --- LÓGICA CORREGIDA: Calcula interés mensual y divide en semanas exactas ---
-                    # Si son 4 cuotas (4 semanas), eso equivale a 1 mes.
                     meses_equivalentes = num_cuotas / 4
                     interes_total = monto * (interes / 100) * meses_equivalentes
                     total_pagar = monto + interes_total
                     cuota_fija = total_pagar / num_cuotas
 
-                # Mostramos el resumen antes de guardar
                 st.write("---")
                 st.subheader("👁️ Vista Previa del Cálculo")
                 c1, c2, c3 = st.columns(3)
