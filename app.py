@@ -21,8 +21,6 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
-    
-    # FÓRMULA CORREGIDA: (Monto / 100) * 0.50 * Días
     interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
@@ -78,7 +76,6 @@ if tipo_usuario == "Cliente":
                             st.write(f"**Préstamo {p['frecuencia']}** (Iniciado: {p['fecha_inicio']})")
                             st.write(f"Monto: S/ {p['monto']:,.2f} | Cuotas: {p['num_cuotas']}")
                             
-                            # Lee las cuotas exactas de la base de datos
                             res_c = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).order("numero").execute()
                             if len(res_c.data) > 0:
                                 df_c = pd.DataFrame(res_c.data)
@@ -161,7 +158,7 @@ elif tipo_usuario == "Administrador":
         st.stop()
 
     # --- MENÚ DEL ADMINISTRADOR ---
-    menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas"])
+    menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas", "Reportes de Ganancia"])
     
     # 1. CLIENTES
     if menu == "Clientes":
@@ -217,7 +214,7 @@ elif tipo_usuario == "Administrador":
                             st.error("Cliente eliminado.")
                             st.rerun()
 
-    # 2. NUEVO PRÉSTAMO (FÓRMULA DIARIA CORREGIDA AQUÍ)
+    # 2. NUEVO PRÉSTAMO
     elif menu == "Nuevo Préstamo":
         st.header("📝 Nuevo Préstamo")
         res_cli = supabase.table("clientes").select("*").execute()
@@ -241,7 +238,6 @@ elif tipo_usuario == "Administrador":
                 interes = st.number_input("Interés Diario (S/ por cada 100)", min_value=0.10, value=0.50, key=f"int_{st.session_state.prestamo_key}")
                 num_cuotas = 1
                 
-                # Vista previa del diario
                 dias_preview = (date.today() - fecha_inicio).days
                 if dias_preview < 0: dias_preview = 0
                 total_pagar = monto + ((monto / 100) * interes * dias_preview)
@@ -445,3 +441,46 @@ elif tipo_usuario == "Administrador":
                                 st.error("Eliminado.")
                                 st.rerun()
                 st.divider()
+
+    # 6. REPORTES DE GANANCIA (NUEVO)
+    elif menu == "Reportes de Ganancia":
+        st.header("📊 Reportes de Ganancia")
+        st.write("Aquí puedes ver el resumen de todo tu dinero.")
+        
+        # Traemos todos los préstamos y cuotas
+        res_p = supabase.table("prestamos").select("*").execute()
+        prestamos = pd.DataFrame(res_p.data)
+        
+        if len(prestamos) == 0:
+            st.info("Aún no hay préstamos registrados.")
+        else:
+            total_prestado = prestamos['monto'].sum()
+            
+            # Traemos las cuotas para saber cuánto se ha pagado
+            res_c = supabase.table("cuotas").select("*").execute()
+            cuotas = pd.DataFrame(res_c.data)
+            
+            cuotas_pagadas = cuotas[cuotas['estado'] == 'pagado']
+            total_cobrado = cuotas_pagadas['monto'].sum()
+            
+            # Ganancia estimada: Suma de intereses de préstamos mensuales/semanales + interés diario
+            ganancia_total = 0
+            
+            for _, p in prestamos.iterrows():
+                if p['frecuencia'] == "Diario Fijo":
+                    # Para diarios, la ganancia máxima es si se paga en el último día pactado (asumimos 30 días para el reporte)
+                    ganancia_total += (p['monto'] / 100) * p['interes'] * 30
+                else:
+                    # Para mensuales, la ganancia es (Total a pagar - Capital)
+                    res_cuotas_p = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).execute()
+                    if len(res_cuotas_p.data) > 0:
+                        total_pagar_p = sum(c['monto'] for c in res_cuotas_p.data)
+                        ganancia_total += (total_pagar_p - p['monto'])
+
+            st.write("---")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Capital Prestado (Histórico)", f"S/ {total_prestado:,.2f}")
+            col2.metric("Dinero Cobrado (Pagado)", f"S/ {total_cobrado:,.2f}")
+            col3.metric("Ganancia por Intereses", f"S/ {ganancia_total:,.2f}", help="Esta es la suma de todos los intereses generados por tus préstamos.")
+            
+            st.info("Nota: La 'Ganancia por Intereses' es el total que ganarás cuando todos los clientes terminen de pagar sus préstamos (según las condiciones pactadas).")
