@@ -21,11 +21,13 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
+    # Fórmula: (Monto / 100) * Interés Diario * Días
     interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
 
 def calcular_cuota(monto, tasa_interes, num_cuotas):
+    # Fórmula Francesa Exacta (la que usas en administración)
     if tasa_interes == 0:
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
@@ -34,7 +36,7 @@ def calcular_cuota(monto, tasa_interes, num_cuotas):
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente", "Simulador"])
 
 # ==========================================
-# 1. PORTAL DEL CLIENTE
+# 1. PORTAL DEL CLIENTE (CONSULTA EXACTA)
 # ==========================================
 if tipo_usuario == "Cliente":
     st.header("🔍 Consulta tu Deuda")
@@ -75,24 +77,29 @@ if tipo_usuario == "Cliente":
                         else:
                             st.write(f"**Préstamo {p['frecuencia']}** (Iniciado: {p['fecha_inicio']})")
                             st.write(f"Monto: S/ {p['monto']:,.2f} | Cuotas: {p['num_cuotas']}")
-                            res_c = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).eq("estado", "pendiente").execute()
+                            
+                            # LEEMOS LAS CUOTAS EXACTAS DE LA BASE DE DATOS
+                            res_c = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).order("numero").execute()
                             if len(res_c.data) > 0:
                                 df_c = pd.DataFrame(res_c.data)
-                                st.write("Cuotas pendientes:")
-                                st.table(df_c[['numero', 'monto', 'fecha_vence']])
+                                st.write("Cronograma de pagos:")
+                                st.table(df_c[['numero', 'monto', 'fecha_vence', 'estado']])
+                                
+                                # Calculamos el total a pagar según lo que está en la BD
+                                total_pagar = df_c['monto'].sum()
+                                st.metric("TOTAL DEL PRÉSTAMO", f"S/ {total_pagar:,.2f}")
                             else:
-                                st.success("Este préstamo ya está pagado.")
+                                st.success("Este préstamo no tiene cuotas registradas.")
         else:
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS
+# 2. SIMULADOR DE PRÉSTAMOS (CON FÓRMULA EXACTA)
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
     st.write("Calcula tu cuota estimada. El interés ya está configurado por EuricBank.")
     
-    # CAMBIAMOS LOS NOMBRES AQUÍ
     tipo = st.selectbox("Modalidad de Pago", ["Mensual", "Semanal", "Diario Fijo"])
     
     TASA_FIJA_MENSUAL = 10.0  
@@ -120,10 +127,12 @@ elif tipo_usuario == "Simulador":
         interes = TASA_FIJA_MENSUAL
         
         if tipo == "Mensual":
+            # Usamos la misma fórmula exacta que en administración
             cuota_fija = calcular_cuota(monto, (interes / 100), num_cuotas)
             total_pagar = cuota_fija * num_cuotas
             
         elif tipo == "Semanal":
+            # La regla de tu negocio: interés mensual dividido en semanas
             meses_equivalentes = num_cuotas / 4
             interes_total = monto * (interes / 100) * meses_equivalentes
             total_pagar = monto + interes_total
@@ -229,8 +238,6 @@ elif tipo_usuario == "Administrador":
             cliente_id = int(clientes[clientes['opcion'] == cliente_sel]['id'].values[0])
             
             fecha_inicio = st.date_input("📅 Fecha de Desembolso", date.today(), key=f"fecha_{st.session_state.prestamo_key}")
-            
-            # CAMBIAMOS LOS NOMBRES AQUÍ TAMBIÉN
             tipo = st.selectbox("Modalidad", ["Diario Fijo", "Mensual", "Semanal"], key=f"tipo_{st.session_state.prestamo_key}")
 
             if tipo == "Diario Fijo":
