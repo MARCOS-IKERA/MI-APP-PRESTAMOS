@@ -4,6 +4,20 @@ from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from supabase import create_client, Client
 
+import streamlit.components.v1 as components
+
+# --- CONFIGURACIÓN PWA (PARA QUE SE VEA COMO APP) ---
+components.html(
+    """
+    <link rel="manifest" href="/manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+      }
+    </script>
+    """,
+    height=0,
+)
 # --- CONFIGURACIÓN CON LOGO ---
 st.set_page_config(page_title="EuricBank", page_icon="yvaNr.jpg", layout="wide")
 
