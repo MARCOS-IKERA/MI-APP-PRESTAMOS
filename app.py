@@ -45,49 +45,26 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO PEGADO AL BORDE SUPERIOR ---
-# Este CSS le dice al navegador que borre el espacio en blanco de arriba
-st.markdown(
-    """
-    <style>
-    .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-    }
-    </style>
-    """, 
-    unsafe_allow_html=True
-)
-
-# --- LOGO EN LA ESQUINA INFERIOR IZQUIERDA (BARRA LATERAL) ---
-# 1. Eliminamos el espacio en blanco de arriba de la pantalla principal
-st.markdown(
-    """
-    <style>
-    .block-container { padding-top: 2rem !important; }
-    </style>
-    """, 
-    unsafe_allow_html=True
-)
-
-# 2. Usamos un truco de CSS para empujar la imagen al fondo de la barra lateral
+# --- TRUCO DE DISEÑO: LOGO ABAJO Y MENÚ ARRIBA ---
 st.sidebar.markdown(
     """
     <style>
-    /* Esto empuja el contenido hacia abajo */
+    /* Hacemos que la barra lateral sea flexible */
     [data-testid="stSidebarUserContent"] {
         display: flex;
         flex-direction: column;
-        justify-content: flex-end;
-        min-height: 85vh; /* Ajusta la altura para que quede al fondo */
+        min-height: 85vh;
     }
+    /* Empujamos el logo hasta el fondo */
     .logo-bottom {
+        margin-top: auto; 
         text-align: center;
         padding-bottom: 10px;
     }
     </style>
+    <!-- Tu logo con tamaño normal -->
     <div class="logo-bottom">
-        <img src="yvaNr.jpg" width="150" alt="EuricBank">
+        <img src="yvaNr.jpg" width="220" alt="EuricBank">
     </div>
     """,
     unsafe_allow_html=True
@@ -167,7 +144,7 @@ if tipo_usuario == "Cliente":
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS (CON CERO INICIAL)
+# 2. SIMULADOR DE PRÉSTAMOS
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
