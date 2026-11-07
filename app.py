@@ -45,18 +45,19 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO MEDIANO EN LA PARTE SUPERIOR CENTRAL ---
+# --- LOGO EN LA PARTE SUPERIOR CENTRAL (TAMAÑO ADECUADO) ---
 st.markdown(
     """
     <style>
     .logo-container {
         display: flex;
-        justify-content: center;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        justify-content: center; /* Centrado horizontal */
+        padding-top: 30px;       /* Espacio arriba */
+        padding-bottom: 20px;    /* Espacio abajo */
     }
     .logo-container img {
-        max-width: 250px; 
+        max-width: 400px;        /* Tamaño más grande para que se vea bien */
+        width: 100%;             /* Se adapta al celular si la pantalla es chica */
         height: auto;
     }
     </style>
