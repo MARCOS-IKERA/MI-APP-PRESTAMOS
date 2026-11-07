@@ -6,10 +6,10 @@ from supabase import create_client, Client
 import streamlit.components.v1 as components
 import base64
 
-# --- CONFIGURACIÓN INICIAL CON LOGO ---
+# --- CONFIGURACIÓN INICIAL ---
 st.set_page_config(page_title="EuricBank", page_icon="yvaNr.jpg", layout="wide")
 
-# --- TRUCO PWA: CONVERTIR MANIFEST EN BASE64 PARA QUE EL CELULAR INSTALE LA APP ---
+# --- TRUCO PWA: INSTALAR COMO APP ---
 manifest_json = """
 {
   "name": "EuricBank",
@@ -45,8 +45,10 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO EN EL MENÚ LATERAL ---
-st.sidebar.image("yvaNr.jpg", use_container_width=True)
+# --- LOGO CENTRADO EN LA PANTALLA PRINCIPAL ---
+col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+with col_logo2:
+    st.image("yvaNr.jpg", use_container_width=True)
 
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
@@ -63,7 +65,7 @@ def calcular_cuota(monto, tasa_interes, num_cuotas):
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
 
-# --- BARRA LATERAL: SELECCIÓN DE PORTAL (INICIA EN CLIENTE) ---
+# --- BARRA LATERAL: MENÚ (SIN LOGO AQUÍ) ---
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Cliente", "Administrador", "Simulador"])
 
 # ==========================================
@@ -80,7 +82,7 @@ if tipo_usuario == "Cliente":
             res_cli = supabase.table("clientes").select("*").or_(f"dni.eq.{busqueda},nombres.ilike.%{busqueda}%").execute()
             
             if len(res_cli.data) == 0:
-                st.error("❌ No se encontró ningún cliente con ese DNI o Nombre. Por favor, verifica los datos.")
+                st.error("❌ No se encontró ningún cliente con ese DNI o Nombre.")
             else:
                 if len(res_cli.data) > 1:
                     nombres_encontrados = [f"{c['nombres']} (DNI: {c['dni']})" for c in res_cli.data]
@@ -122,7 +124,7 @@ if tipo_usuario == "Cliente":
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS (CON CERO POR DEFECTO)
+# 2. SIMULADOR DE PRÉSTAMOS (CON CERO INICIAL)
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
@@ -136,7 +138,6 @@ elif tipo_usuario == "Simulador":
     TASA_FIJA_MENSUAL = 10.0  
     TASA_DIARIA_POR_CIEN = 0.50 
 
-    # Volvemos a number_input pero con value=0.0
     if tipo == "Diario Fijo":
         monto = st.number_input("Monto a Prestar (S/)", min_value=0.0, step=100.0, value=0.0, key=f"monto_d_{st.session_state.sim_key}")
         dias = st.number_input("¿Para cuántos días?", min_value=0, step=1, value=0, key=f"dias_{st.session_state.sim_key}")
