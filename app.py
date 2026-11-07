@@ -59,10 +59,39 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Logo centrado con tamaño normal
-col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
-with col_logo2:
-    st.image("yvaNr.jpg", use_container_width=True)
+# --- LOGO EN LA ESQUINA INFERIOR IZQUIERDA (BARRA LATERAL) ---
+# 1. Eliminamos el espacio en blanco de arriba de la pantalla principal
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 2rem !important; }
+    </style>
+    """, 
+    unsafe_allow_html=True
+)
+
+# 2. Usamos un truco de CSS para empujar la imagen al fondo de la barra lateral
+st.sidebar.markdown(
+    """
+    <style>
+    /* Esto empuja el contenido hacia abajo */
+    [data-testid="stSidebarUserContent"] {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 85vh; /* Ajusta la altura para que quede al fondo */
+    }
+    .logo-bottom {
+        text-align: center;
+        padding-bottom: 10px;
+    }
+    </style>
+    <div class="logo-bottom">
+        <img src="yvaNr.jpg" width="150" alt="EuricBank">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
