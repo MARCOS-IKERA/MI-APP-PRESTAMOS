@@ -45,10 +45,28 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO CENTRADO EN LA PANTALLA PRINCIPAL ---
-col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
-with col_logo2:
-    st.image("yvaNr.jpg", use_container_width=True)
+# --- LOGO PEQUEÑO EN LA PARTE SUPERIOR IZQUIERDA ---
+# Usamos HTML para ponerlo pequeño y alineado a la izquierda
+st.markdown(
+    """
+    <style>
+    .logo-container {
+        display: flex;
+        justify-content: flex-start; /* Alinea a la izquierda */
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .logo-container img {
+        max-width: 150px; /* Ajusta el tamaño del logo aquí (150px es pequeño) */
+        height: auto;
+    }
+    </style>
+    <div class="logo-container">
+        <img src="yvaNr.jpg" alt="EuricBank Logo">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- FUNCIONES DE CÁLCULO ---
 def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
