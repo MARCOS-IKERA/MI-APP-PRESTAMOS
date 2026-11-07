@@ -3,23 +3,42 @@ import pandas as pd
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from supabase import create_client, Client
-
 import streamlit.components.v1 as components
+import base64
 
-# --- CONFIGURACIÓN PWA (PARA QUE SE VEA COMO APP) ---
+# --- CONFIGURACIÓN INICIAL CON LOGO ---
+st.set_page_config(page_title="EuricBank", page_icon="yvaNr.jpg", layout="wide")
+
+# --- TRUCO PWA: CONVERTIR MANIFEST EN BASE64 PARA QUE EL CELULAR INSTALE LA APP ---
+manifest_json = """
+{
+  "name": "EuricBank",
+  "short_name": "EuricBank",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#006241",
+  "icons": [
+    {
+      "src": "yvaNr.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
+"""
+b64_manifest = base64.b64encode(manifest_json.encode()).decode()
 components.html(
-    """
-    <link rel="manifest" href="/manifest.json">
+    f"""
+    <link rel="manifest" href="data:application/manifest+json;base64,{b64_manifest}">
     <script>
-      if ('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator) {{
         navigator.serviceWorker.register('/sw.js');
-      }
+      }}
     </script>
     """,
     height=0,
 )
-# --- CONFIGURACIÓN CON LOGO ---
-st.set_page_config(page_title="EuricBank", page_icon="yvaNr.jpg", layout="wide")
 
 # --- CONEXIÓN A SUPABASE ---
 url = st.secrets["SUPABASE_URL"]
@@ -35,6 +54,7 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
+    # Fórmula exacta: (Monto / 100) * Interés Diario * Días
     interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
@@ -44,8 +64,8 @@ def calcular_cuota(monto, tasa_interes, num_cuotas):
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
 
-# --- BARRA LATERAL: SELECCIÓN DE PORTAL ---
-tipo_usuario = st.sidebar.radio("Ingresar como:", ["Administrador", "Cliente", "Simulador"])
+# --- BARRA LATERAL: SELECCIÓN DE PORTAL (INICIA EN CLIENTE) ---
+tipo_usuario = st.sidebar.radio("Ingresar como:", ["Cliente", "Administrador", "Simulador"])
 
 # ==========================================
 # 1. PORTAL DEL CLIENTE
@@ -456,12 +476,11 @@ elif tipo_usuario == "Administrador":
                                 st.rerun()
                 st.divider()
 
-    # 6. REPORTES DE GANANCIA (NUEVO)
+    # 6. REPORTES DE GANANCIA
     elif menu == "Reportes de Ganancia":
         st.header("📊 Reportes de Ganancia")
         st.write("Aquí puedes ver el resumen de todo tu dinero.")
         
-        # Traemos todos los préstamos y cuotas
         res_p = supabase.table("prestamos").select("*").execute()
         prestamos = pd.DataFrame(res_p.data)
         
@@ -470,22 +489,18 @@ elif tipo_usuario == "Administrador":
         else:
             total_prestado = prestamos['monto'].sum()
             
-            # Traemos las cuotas para saber cuánto se ha pagado
             res_c = supabase.table("cuotas").select("*").execute()
             cuotas = pd.DataFrame(res_c.data)
             
             cuotas_pagadas = cuotas[cuotas['estado'] == 'pagado']
             total_cobrado = cuotas_pagadas['monto'].sum()
             
-            # Ganancia estimada: Suma de intereses de préstamos mensuales/semanales + interés diario
             ganancia_total = 0
             
             for _, p in prestamos.iterrows():
                 if p['frecuencia'] == "Diario Fijo":
-                    # Para diarios, la ganancia máxima es si se paga en el último día pactado (asumimos 30 días para el reporte)
                     ganancia_total += (p['monto'] / 100) * p['interes'] * 30
                 else:
-                    # Para mensuales, la ganancia es (Total a pagar - Capital)
                     res_cuotas_p = supabase.table("cuotas").select("*").eq("prestamo_id", p['id']).execute()
                     if len(res_cuotas_p.data) > 0:
                         total_pagar_p = sum(c['monto'] for c in res_cuotas_p.data)
