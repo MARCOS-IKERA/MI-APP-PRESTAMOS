@@ -54,7 +54,6 @@ def calcular_deuda_diaria(monto_inicial, interes_diario_soles, fecha_inicio):
     fecha_ini = datetime.strptime(str(fecha_inicio), '%Y-%m-%d').date()
     dias_transcurridos = (hoy - fecha_ini).days
     if dias_transcurridos < 0: return monto_inicial, 0, 0.0
-    # Fórmula exacta: (Monto / 100) * Interés Diario * Días
     interes_generado = (monto_inicial / 100) * interes_diario_soles * dias_transcurridos
     monto_actual = monto_inicial + interes_generado
     return round(monto_actual, 2), dias_transcurridos, round(interes_generado, 2)
@@ -123,20 +122,25 @@ if tipo_usuario == "Cliente":
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS
+# 2. SIMULADOR DE PRÉSTAMOS (LIMPIO Y SIN TEXTOS DE TASA)
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
-    st.write("Calcula tu cuota estimada. El interés ya está configurado por EuricBank.")
+    st.write("Calcula tu cuota estimada.")
     
-    tipo = st.selectbox("Modalidad de Pago", ["Mensual", "Semanal", "Diario Fijo"])
+    # Llave para poder limpiar el formulario
+    if "sim_key" not in st.session_state:
+        st.session_state.sim_key = 0
+
+    tipo = st.selectbox("Modalidad de Pago", ["Mensual", "Semanal", "Diario Fijo"], key=f"tipo_sim_{st.session_state.sim_key}")
     
+    # Tasas fijas ocultas
     TASA_FIJA_MENSUAL = 10.0  
     TASA_DIARIA_POR_CIEN = 0.50 
 
     if tipo == "Diario Fijo":
-        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
-        dias = st.number_input("¿Para cuántos días?", min_value=1, value=10)
+        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0, key=f"monto_d_{st.session_state.sim_key}")
+        dias = st.number_input("¿Para cuántos días?", min_value=1, value=10, key=f"dias_{st.session_state.sim_key}")
         
         interes_gen = (monto / 100) * TASA_DIARIA_POR_CIEN * dias
         total = monto + interes_gen
@@ -147,11 +151,10 @@ elif tipo_usuario == "Simulador":
         c1.metric("Capital", f"S/ {monto:,.2f}")
         c2.metric("Interés Generado", f"S/ {interes_gen:,.2f}")
         c3.metric("TOTAL A PAGAR", f"S/ {total:,.2f}")
-        st.info(f"* Simulación calculada con un interés de S/ {TASA_DIARIA_POR_CIEN} por cada 100 soles al día.")
 
     else:
-        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0)
-        num_cuotas = st.number_input("N° de Cuotas", min_value=1, value=4)
+        monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0, key=f"monto_m_{st.session_state.sim_key}")
+        num_cuotas = st.number_input("N° de Cuotas", min_value=1, value=4, key=f"cuo_{st.session_state.sim_key}")
         
         interes = TASA_FIJA_MENSUAL
         
@@ -171,7 +174,11 @@ elif tipo_usuario == "Simulador":
         c1.metric("Cuota a Pagar", f"S/ {round(cuota_fija, 2):,.2f}")
         c2.metric("Total Intereses", f"S/ {round(total_pagar - monto, 2):,.2f}")
         c3.metric("Total a Pagar", f"S/ {round(total_pagar, 2):,.2f}")
-        st.info(f"* Simulación calculada con un interés mensual del {TASA_FIJA_MENSUAL}%")
+
+    # Botón para limpiar la simulación
+    if st.button("🔄 Limpiar Simulador"):
+        st.session_state.sim_key += 1
+        st.rerun()
 
 # ==========================================
 # 3. PORTAL DEL ADMINISTRADOR
