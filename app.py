@@ -45,7 +45,21 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO EN LA PARTE SUPERIOR CENTRAL (TAMAÑO NORMAL) ---
+# --- LOGO PEGADO AL BORDE SUPERIOR ---
+# Este CSS le dice al navegador que borre el espacio en blanco de arriba
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+    }
+    </style>
+    """, 
+    unsafe_allow_html=True
+)
+
+# Logo centrado con tamaño normal
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
     st.image("yvaNr.jpg", use_container_width=True)
