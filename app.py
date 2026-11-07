@@ -45,19 +45,18 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- LOGO PEQUEÑO EN LA PARTE SUPERIOR IZQUIERDA ---
-# Usamos HTML para ponerlo pequeño y alineado a la izquierda
+# --- LOGO MEDIANO EN LA PARTE SUPERIOR CENTRAL ---
 st.markdown(
     """
     <style>
     .logo-container {
         display: flex;
-        justify-content: flex-start; /* Alinea a la izquierda */
+        justify-content: center;
         padding-top: 10px;
         padding-bottom: 10px;
     }
     .logo-container img {
-        max-width: 150px; /* Ajusta el tamaño del logo aquí (150px es pequeño) */
+        max-width: 250px; 
         height: auto;
     }
     </style>
@@ -83,7 +82,7 @@ def calcular_cuota(monto, tasa_interes, num_cuotas):
         return monto / num_cuotas
     return monto * (tasa_interes * (1 + tasa_interes)**num_cuotas) / ((1 + tasa_interes)**num_cuotas - 1)
 
-# --- BARRA LATERAL: MENÚ (SIN LOGO AQUÍ) ---
+# --- BARRA LATERAL: SELECCIÓN DE PORTAL (INICIA EN CLIENTE) ---
 tipo_usuario = st.sidebar.radio("Ingresar como:", ["Cliente", "Administrador", "Simulador"])
 
 # ==========================================
