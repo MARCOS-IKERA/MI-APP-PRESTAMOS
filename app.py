@@ -45,7 +45,7 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- TRUCO DE DISEÑO: MENÚ ARRIBA, LOGO ABAJO GRANDE ---
+# --- TRUCO DE DISEÑO: MENÚ ARRIBA, LOGO ABAJO GRANDE (550px) ---
 st.sidebar.markdown(
     """
     <style>
@@ -53,18 +53,18 @@ st.sidebar.markdown(
     [data-testid="stSidebarUserContent"] {
         display: flex;
         flex-direction: column;
-        min-height: 88vh; /* Altura para empujar el logo abajo */
+        min-height: 85vh; /* Altura para empujar el logo abajo */
     }
     /* Estilos para el contenedor del logo */
     .logo-bottom {
         margin-top: auto; /* Esto empuja el logo al fondo */
         text-align: center;
-        padding-bottom: 20px;
+        padding-bottom: 10px;
     }
     </style>
-    <!-- Tu logo con tamaño normal y visible -->
+    <!-- Tu logo con tamaño GRANDE (550px) -->
     <div class="logo-bottom">
-        <img src="yvaNr.jpg" width="350" alt="EuricBank">
+        <img src="yvaNr.jpg" width="550" alt="EuricBank">
     </div>
     """,
     unsafe_allow_html=True
