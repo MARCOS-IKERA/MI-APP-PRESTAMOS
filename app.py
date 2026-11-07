@@ -122,63 +122,67 @@ if tipo_usuario == "Cliente":
             st.warning("Por favor, ingresa tu DNI o Nombre.")
 
 # ==========================================
-# 2. SIMULADOR DE PRÉSTAMOS (LIMPIO Y SIN TEXTOS DE TASA)
+# 2. SIMULADOR DE PRÉSTAMOS
 # ==========================================
 elif tipo_usuario == "Simulador":
     st.header("🧮 Simulador de Préstamos")
     st.write("Calcula tu cuota estimada.")
     
-    # Llave para poder limpiar el formulario
     if "sim_key" not in st.session_state:
         st.session_state.sim_key = 0
 
     tipo = st.selectbox("Modalidad de Pago", ["Mensual", "Semanal", "Diario Fijo"], key=f"tipo_sim_{st.session_state.sim_key}")
     
-    # Tasas fijas ocultas
     TASA_FIJA_MENSUAL = 10.0  
     TASA_DIARIA_POR_CIEN = 0.50 
 
     if tipo == "Diario Fijo":
         monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0, key=f"monto_d_{st.session_state.sim_key}")
         dias = st.number_input("¿Para cuántos días?", min_value=1, value=10, key=f"dias_{st.session_state.sim_key}")
-        
-        interes_gen = (monto / 100) * TASA_DIARIA_POR_CIEN * dias
-        total = monto + interes_gen
-        
-        st.write("---")
-        st.subheader("👁️ Tu Simulación")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Capital", f"S/ {monto:,.2f}")
-        c2.metric("Interés Generado", f"S/ {interes_gen:,.2f}")
-        c3.metric("TOTAL A PAGAR", f"S/ {total:,.2f}")
-
     else:
         monto = st.number_input("Monto a Prestar (S/)", min_value=10.0, step=100.0, value=500.0, key=f"monto_m_{st.session_state.sim_key}")
         num_cuotas = st.number_input("N° de Cuotas", min_value=1, value=4, key=f"cuo_{st.session_state.sim_key}")
-        
-        interes = TASA_FIJA_MENSUAL
-        
-        if tipo == "Mensual":
-            cuota_fija = calcular_cuota(monto, (interes / 100), num_cuotas)
-            total_pagar = cuota_fija * num_cuotas
-            
-        elif tipo == "Semanal":
-            meses_equivalentes = num_cuotas / 4
-            interes_total = monto * (interes / 100) * meses_equivalentes
-            total_pagar = monto + interes_total
-            cuota_fija = total_pagar / num_cuotas
 
-        st.write("---")
-        st.subheader("👁️ Tu Simulación")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Cuota a Pagar", f"S/ {round(cuota_fija, 2):,.2f}")
-        c2.metric("Total Intereses", f"S/ {round(total_pagar - monto, 2):,.2f}")
-        c3.metric("Total a Pagar", f"S/ {round(total_pagar, 2):,.2f}")
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        btn_calcular = st.button("🧮 Calcular Simulación", use_container_width=True)
+    with col_btn2:
+        btn_limpiar = st.button("🔄 Limpiar / Reiniciar", use_container_width=True)
 
-    # Botón para limpiar la simulación
-    if st.button("🔄 Limpiar Simulador"):
+    if btn_limpiar:
         st.session_state.sim_key += 1
         st.rerun()
+
+    if btn_calcular:
+        st.write("---")
+        st.subheader("👁️ Resultado de tu Simulación")
+        
+        if tipo == "Diario Fijo":
+            interes_gen = (monto / 100) * TASA_DIARIA_POR_CIEN * dias
+            total = monto + interes_gen
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Capital", f"S/ {monto:,.2f}")
+            c2.metric("Interés Generado", f"S/ {interes_gen:,.2f}")
+            c3.metric("TOTAL A PAGAR", f"S/ {total:,.2f}")
+
+        else:
+            interes = TASA_FIJA_MENSUAL
+            
+            if tipo == "Mensual":
+                cuota_fija = calcular_cuota(monto, (interes / 100), num_cuotas)
+                total_pagar = cuota_fija * num_cuotas
+                
+            elif tipo == "Semanal":
+                meses_equivalentes = num_cuotas / 4
+                interes_total = monto * (interes / 100) * meses_equivalentes
+                total_pagar = monto + interes_total
+                cuota_fija = total_pagar / num_cuotas
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Cuota a Pagar", f"S/ {round(cuota_fija, 2):,.2f}")
+            c2.metric("Total Intereses", f"S/ {round(total_pagar - monto, 2):,.2f}")
+            c3.metric("Total a Pagar", f"S/ {round(total_pagar, 2):,.2f}")
 
 # ==========================================
 # 3. PORTAL DEL ADMINISTRADOR
@@ -198,7 +202,6 @@ elif tipo_usuario == "Administrador":
                 st.error("❌ Contraseña incorrecta")
         st.stop()
 
-    # --- MENÚ DEL ADMINISTRADOR ---
     menu = st.sidebar.selectbox("Ir a:", ["Clientes", "Nuevo Préstamo", "Cronograma y Pagos", "Cartera Vencida", "Inversionistas", "Reportes de Ganancia"])
     
     # 1. CLIENTES
